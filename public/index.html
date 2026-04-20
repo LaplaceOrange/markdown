@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markdown 在线预览与协作</title>
+  <link rel="stylesheet" href="/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="/vendor/highlight/github-dark.min.css" />
+  <script src="/vendor/marked/marked.min.js"></script>
+  <script src="/vendor/highlight/highlight.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f3f4f6;
+      --muted: #9aa3b2;
+      --accent: #62d0ff;
+      --accent-strong: #2d9cdb;
+      --ink: #1f2937;
+      --danger: #ff6b6b;
+      --success: #46d39a;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      --editor-font-size: 16px;
+      --preview-font-size: 16px;
+      --editor-width: 50%;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(98, 208, 255, 0.12), transparent 32%),
+        radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 25%),
+        linear-gradient(135deg, #0d1015 0%, #151a22 45%, #0d1015 100%);
+      color: var(--text);
+      font-family: 'Outfit', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    body { padding: 24px; }
+
+    .app-shell {
+      min-height: calc(100vh - 48px);
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      background: rgba(11, 14, 19, 0.68);
+    }
+
+    .sidebar {
+      padding: 28px;
+      background: linear-gradient(180deg, rgba(10, 13, 18, 0.96), rgba(19, 25, 34, 0.92));
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow: auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 28px;
+      font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+      letter-spacing: 0.04em;
+    }
+
+    .brand p,
+    .muted,
+    .helper-text,
+    .empty-state,
+    .status-bar,
+    .room-meta,
+    .admin-note,
+    .panel p,
+    .panel li,
+    .watermark,
+    .topbar p,
+    .member-list,
+    .load-grid small {
+      color: var(--muted);
+    }
+
+    .brand p {
+      margin: 10px 0 0;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .stack { display: flex; flex-direction: column; gap: 14px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .panel {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .panel h2, .panel h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    label {
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      color: #dce2ea;
+    }
+
+    input[type="text"], input[type="number"], textarea, button {
+      font: inherit;
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      padding: 0 14px;
+      outline: none;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    textarea:focus {
+      border-color: rgba(98, 208, 255, 0.8);
+      box-shadow: 0 0 0 3px rgba(98, 208, 255, 0.14);
+    }
+
+    button {
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8ce2ff);
+      color: #091018;
+      font-weight: 700;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.14);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.12);
+      border-color: rgba(255, 107, 107, 0.28);
+      color: #ffd3d3;
+    }
+
+    .mode-actions button { flex: 1; }
+
+    .content-area {
+      background: linear-gradient(180deg, rgba(246, 248, 251, 0.95), rgba(237, 241, 246, 0.97));
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+    }
+
+    .topbar {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.7);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 24px;
+      font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+      color: #0f172a;
+    }
+
+    .topbar p {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .topbar-right { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+
+    .view { display: none; height: 100%; }
+    .view.active { display: block; }
+
+    .welcome-view, .lobby-view { padding: 28px; }
+
+    .hero-card, .lobby-grid, .editor-shell {
+      height: calc(100vh - 145px);
+      min-height: 620px;
+    }
+
+    .hero-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 28px;
+      padding: 36px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.98)),
+        linear-gradient(120deg, rgba(98, 208, 255, 0.1), transparent);
+      display: grid;
+      align-items: center;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .hero-card h3 {
+      margin: 0;
+      font-size: 38px;
+      line-height: 1.25;
+      color: #0f172a;
+      font-family: 'Noto Serif SC', serif;
+    }
+
+    .hero-card p {
+      max-width: 720px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: #475569;
+    }
+
+    .hero-tips {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .hero-tip, .overview-card, .member-panel {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .hero-tip strong, .overview-card strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+
+    .lobby-grid {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      padding: 22px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+      min-width: 0;
+    }
+
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #0f172a;
+    }
+
+    .card p {
+      margin: 0 0 12px;
+      line-height: 1.7;
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .room-list {
+      display: grid;
+      gap: 14px;
+      max-height: calc(100vh - 250px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .room-item {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(247, 250, 252, 0.94);
+      display: grid;
+      gap: 12px;
+    }
+
+    .room-item strong {
+      font-size: 16px;
+      color: #0f172a;
+    }
+
+    .room-meta {
+      font-size: 13px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .editor-view { height: 100%; }
+
+    .editor-shell {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-height: 0;
+    }
+
+    .editor-toolbar, .status-bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .status-bar {
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+      border-bottom: none;
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .control-chip, .status-badge {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .status-stack {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .status-badge {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+
+    .status-badge-panel {
+      min-width: 280px;
+      max-width: 360px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+    }
+
+    .load-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .load-grid strong {
+      display: block;
+      font-size: 18px;
+      color: #0f172a;
+    }
+
+    .member-panel h3, .status-badge-panel h3 {
+      margin: 0 0 10px;
+      color: #0f172a;
+      font-size: 16px;
+    }
+
+    .member-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .member-pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(98, 208, 255, 0.1);
+      border: 1px solid rgba(98, 208, 255, 0.18);
+      color: #0f172a;
+      font-size: 13px;
+    }
+
+    input[type="range"] {
+      width: 110px;
+    }
+
+    .editor-pane-wrap {
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .pane { min-width: 0; overflow: auto; height: 100%; }
+    .editor-pane { width: var(--editor-width); background: #0f1720; color: #e2e8f0; }
+    .preview-pane { flex: 1; background: #ffffff; }
+
+    .divider {
+      width: 10px;
+      cursor: col-resize;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.08));
+      position: relative;
+      flex: 0 0 10px;
+    }
+
+    .divider::after {
+      content: '';
+      position: absolute;
+      inset: 50% 2px auto 2px;
+      height: 54px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    #markdownInput {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: inherit;
+      padding: 24px;
+      line-height: 1.75;
+      font-size: var(--editor-font-size);
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+
+    #preview {
+      height: 100%;
+      overflow: auto;
+      padding: 28px 32px 40px;
+      line-height: 1.85;
+      font-size: var(--preview-font-size);
+      color: #1f2937;
+      font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+      word-break: break-word;
+    }
+
+    #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+      color: #0f172a;
+      margin-top: 1.5em;
+      margin-bottom: 0.6em;
+      line-height: 1.35;
+    }
+
+    #preview pre {
+      border-radius: 18px;
+      overflow: auto;
+      padding: 18px;
+      background: #0b1220;
+    }
+
+    #preview code { font-family: 'Consolas', 'Courier New', monospace; }
+
+    #preview blockquote {
+      margin: 1.2em 0;
+      padding: 0.2em 1em;
+      border-left: 4px solid var(--accent-strong);
+      color: #475569;
+      background: rgba(98, 208, 255, 0.08);
+      border-radius: 0 12px 12px 0;
+    }
+
+    #preview table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    #preview th, #preview td { border: 1px solid rgba(15, 23, 42, 0.12); padding: 10px 12px; }
+
+    .watermark {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.9);
+      z-index: 20;
+    }
+
+    .watermark:hover { color: rgba(98, 208, 255, 0.95); }
+    .status-ok { color: #15803d; }
+    .status-error { color: #b91c1c; }
+    .hidden { display: none !important; }
+
+    @media (max-width: 1200px) {
+      .app-shell, .lobby-grid { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--line); }
+      .hero-tips { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .app-shell { min-height: calc(100vh - 24px); }
+      .hero-card, .lobby-grid, .editor-shell { height: auto; min-height: 0; }
+      .editor-pane-wrap { flex-direction: column; }
+      .editor-pane, .preview-pane { width: 100%; height: 50vh; }
+      .divider { width: 100%; height: 10px; cursor: row-resize; }
+      .divider::after { inset: 2px 50% 2px auto; width: 54px; height: auto; transform: translateX(-50%); }
+      .status-badge-panel { max-width: 100%; }
+      .load-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Markdown Lab</h1>
+        <p>本地即时预览 + 房间协作编辑。Markdown 转换与代码高亮全部在浏览器本地完成。</p>
+      </div>
+
+      <section class="panel stack">
+        <h2>账户信息</h2>
+        <label>
+          当前昵称
+          <input id="nicknameInput" type="text" maxlength="20" placeholder="请输入昵称" />
+        </label>
+        <div class="row">
+          <button id="saveNicknameBtn" class="btn-primary">保存昵称</button>
+          <button id="refreshRoomsBtn" class="btn-secondary">刷新房间</button>
+        </div>
+        <p class="helper-text">首次访问会自动生成默认账号。仅允许中英文，最长 20 字，不可包含违禁词。</p>
+      </section>
+
+      <section class="panel stack">
+        <h2>模式入口</h2>
+        <div class="row mode-actions">
+          <button id="singleModeBtn" class="btn-primary">单人模式</button>
+          <button id="coopModeBtn" class="btn-secondary">合作模式</button>
+        </div>
+        <p class="helper-text">单人模式仅保存在当前页面内存；合作模式进入房间大厅。</p>
+      </section>
+
+      <section id="adminPanel" class="panel stack hidden">
+        <h2>管理员面板</h2>
+        <p class="admin-note">检测到 Cookie 中存在管理员暗号，可查看活跃房间并修改人数上限、违禁词。</p>
+        <label>
+          房间最大在线人数
+          <input id="adminMaxPersonInput" type="number" min="1" max="100" />
+        </label>
+        <label>
+          违禁词（英文逗号分隔）
+          <input id="adminBannedWordsInput" type="text" placeholder="例如：78,91,sb" />
+        </label>
+        <button id="saveAdminSettingsBtn" class="btn-primary">保存管理员设置</button>
+        <div id="adminRooms" class="stack"></div>
+      </section>
+
+      <section class="panel stack">
+        <h2>房间成员</h2>
+        <div id="memberList" class="member-list"><span class="muted">当前未进入协作房间。</span></div>
+      </section>
+
+      <section class="panel stack">
+        <h2>状态</h2>
+        <div id="messageBox" class="muted">准备就绪。</div>
+      </section>
+    </aside>
+
+    <main class="content-area">
+      <header class="topbar">
+        <div>
+          <h2 id="viewTitle">欢迎</h2>
+          <p id="viewSubtitle">选择使用单人模式或进入合作大厅。</p>
+        </div>
+        <div class="topbar-right">
+          <div class="controls">
+            <div class="control-chip">用户：<strong id="currentUserText">-</strong></div>
+            <div class="control-chip">模式：<strong id="currentModeText">未选择</strong></div>
+            <div class="control-chip">房间：<strong id="currentRoomText">-</strong></div>
+          </div>
+          <div class="status-stack">
+            <div id="serverBadge" class="status-badge">服务器状态 ▾</div>
+            <div id="serverBadgePanel" class="status-badge-panel hidden">
+              <h3>服务器负载情况</h3>
+              <div class="load-grid">
+                <div><small>在线连接</small><strong id="loadConnections">0</strong></div>
+                <div><small>活跃房间</small><strong id="loadRooms">0</strong></div>
+                <div><small>Node 内存</small><strong id="loadMemory">0 MB</strong></div>
+                <div><small>Heap 已用</small><strong id="loadHeap">0 MB</strong></div>
+                <div><small>运行时长</small><strong id="loadUptime">0s</strong></div>
+                <div><small>系统负载</small><strong id="loadAvg">0 / 0 / 0</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="welcomeView" class="view active welcome-view">
+        <div class="hero-card">
+          <div class="stack">
+            <h3>一个页面，完成 Markdown 编辑、预览与多人同步。</h3>
+            <p>左侧是深色控制台风格编辑区，右侧是清晰的排版预览区。选择单人模式可本地创作，选择合作模式则可在房间中与其他成员共享同一份 Markdown 文档。</p>
+            <div class="hero-tips">
+              <div class="hero-tip">
+                <strong>本地渲染</strong>
+                <span>marked.js + highlight.js 在浏览器侧完成解析和代码高亮。</span>
+              </div>
+              <div class="hero-tip">
+                <strong>实时同步</strong>
+                <span>基于 Socket.io 房间广播，仅同步同房间成员。</span>
+              </div>
+              <div class="hero-tip">
+                <strong>可调布局</strong>
+                <span>拖拽中间分割线，独立调整编辑区与预览区字体大小。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="lobbyView" class="view lobby-view">
+        <div class="lobby-grid">
+          <div class="card stack">
+            <div>
+              <h3>创建房间</h3>
+              <p>每个账户最多创建 3 个房间。房间号创建后不可修改，仅房主可删除。每个房间当前最多 <span id="maxPersonHint">-</span> 人在线。</p>
+            </div>
+            <label>
+              Room ID
+              <input id="createRoomInput" type="text" maxlength="20" placeholder="仅中英文，最长 20 字" />
+            </label>
+            <button id="createRoomBtn" class="btn-primary">创建房间</button>
+            <div>
+              <h3>加入房间</h3>
+              <p>输入目标 Room ID 即可加入协作编辑。</p>
+            </div>
+            <label>
+              Room ID
+              <input id="joinRoomInput" type="text" maxlength="20" placeholder="输入要加入的房间号" />
+            </label>
+            <button id="joinRoomBtn" class="btn-secondary">加入房间</button>
+          </div>
+
+          <div class="card stack">
+            <div>
+              <h3>活跃房间</h3>
+              <p>当前内存中的房间列表。管理员面板可查看并修改全局策略。</p>
+            </div>
+            <div id="roomList" class="room-list">
+              <div class="empty-state">当前暂无房间，创建第一个协作空间吧。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="editorView" class="view editor-view">
+        <div class="editor-shell">
+          <div class="editor-toolbar">
+            <div class="controls">
+              <div class="control-chip">编辑字体
+                <input id="editorFontSlider" type="range" min="12" max="28" value="16" />
+                <span id="editorFontValue">16px</span>
+              </div>
+              <div class="control-chip">预览字体
+                <input id="previewFontSlider" type="range" min="12" max="28" value="16" />
+                <span id="previewFontValue">16px</span>
+              </div>
+              <div class="control-chip">人数上限：<strong id="roomLimitText">-</strong></div>
+            </div>
+            <div class="controls">
+              <button id="leaveRoomBtn" class="btn-secondary hidden">离开房间</button>
+              <button id="deleteRoomBtn" class="btn-danger hidden">删除房间</button>
+              <button id="backToLobbyBtn" class="btn-secondary hidden">返回大厅</button>
+            </div>
+          </div>
+
+          <div class="status-bar">
+            <span id="syncStatus">未连接协作房间。</span>
+            <span id="memberStatus">房间人数：-</span>
+            <span id="wordStatus">字符数：0</span>
+          </div>
+
+          <div class="editor-pane-wrap" id="paneWrap">
+            <section class="pane editor-pane">
+              <textarea id="markdownInput" spellcheck="false" placeholder="# 在这里输入 Markdown...
+
+```js
+console.log('hello');
+```"></textarea>
+            </section>
+            <div class="divider" id="divider" title="拖拽调整宽度"></div>
+            <section class="pane preview-pane">
+              <div id="preview"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <a class="watermark" href="https://github.com/LaplaceOrange/markdown" target="_blank" rel="noopener noreferrer">Powered by FSY</a>
+
+  <script>
+    const socket = io();
+    const NAME_ROOM_REGEX = /^[A-Za-z\u4e00-\u9fa5]{1,20}$/;
+    const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const state = {
+      username: '',
+      mode: '',
+      currentRoomId: '',
+      currentRoomOwner: '',
+      isOwner: false,
+      editorValue: '# 欢迎使用 Markdown 在线预览\n\n- 单人模式：仅本地编辑\n- 合作模式：进入房间与他人实时协作\n\n```js\nconsole.log("Markdown Lab");\n```',
+      isApplyingRemote: false,
+      adminEnabled: false,
+      memberCount: 0,
+      memberNames: [],
+      maxPerson: 5,
+      bannedWords: ['78', '91', 'sb'],
+      load: {
+        totalConnections: 0,
+        activeRooms: 0,
+        nodeMemoryMB: 0,
+        heapUsedMB: 0,
+        uptimeSeconds: 0,
+        systemLoadAvg: [0, 0, 0],
+      },
+    };
+
+    const els = {
+      nicknameInput: document.getElementById('nicknameInput'),
+      saveNicknameBtn: document.getElementById('saveNicknameBtn'),
+      refreshRoomsBtn: document.getElementById('refreshRoomsBtn'),
+      singleModeBtn: document.getElementById('singleModeBtn'),
+      coopModeBtn: document.getElementById('coopModeBtn'),
+      adminPanel: document.getElementById('adminPanel'),
+      adminRooms: document.getElementById('adminRooms'),
+      adminMaxPersonInput: document.getElementById('adminMaxPersonInput'),
+      adminBannedWordsInput: document.getElementById('adminBannedWordsInput'),
+      saveAdminSettingsBtn: document.getElementById('saveAdminSettingsBtn'),
+      memberList: document.getElementById('memberList'),
+      messageBox: document.getElementById('messageBox'),
+      viewTitle: document.getElementById('viewTitle'),
+      viewSubtitle: document.getElementById('viewSubtitle'),
+      currentUserText: document.getElementById('currentUserText'),
+      currentModeText: document.getElementById('currentModeText'),
+      currentRoomText: document.getElementById('currentRoomText'),
+      serverBadge: document.getElementById('serverBadge'),
+      serverBadgePanel: document.getElementById('serverBadgePanel'),
+      loadConnections: document.getElementById('loadConnections'),
+      loadRooms: document.getElementById('loadRooms'),
+      loadMemory: document.getElementById('loadMemory'),
+      loadHeap: document.getElementById('loadHeap'),
+      loadUptime: document.getElementById('loadUptime'),
+      loadAvg: document.getElementById('loadAvg'),
+      welcomeView: document.getElementById('welcomeView'),
+      lobbyView: document.getElementById('lobbyView'),
+      editorView: document.getElementById('editorView'),
+      maxPersonHint: document.getElementById('maxPersonHint'),
+      createRoomInput: document.getElementById('createRoomInput'),
+      joinRoomInput: document.getElementById('joinRoomInput'),
+      createRoomBtn: document.getElementById('createRoomBtn'),
+      joinRoomBtn: document.getElementById('joinRoomBtn'),
+      roomList: document.getElementById('roomList'),
+      editorFontSlider: document.getElementById('editorFontSlider'),
+      previewFontSlider: document.getElementById('previewFontSlider'),
+      editorFontValue: document.getElementById('editorFontValue'),
+      previewFontValue: document.getElementById('previewFontValue'),
+      roomLimitText: document.getElementById('roomLimitText'),
+      leaveRoomBtn: document.getElementById('leaveRoomBtn'),
+      deleteRoomBtn: document.getElementById('deleteRoomBtn'),
+      backToLobbyBtn: document.getElementById('backToLobbyBtn'),
+      markdownInput: document.getElementById('markdownInput'),
+      preview: document.getElementById('preview'),
+      divider: document.getElementById('divider'),
+      paneWrap: document.getElementById('paneWrap'),
+      syncStatus: document.getElementById('syncStatus'),
+      memberStatus: document.getElementById('memberStatus'),
+      wordStatus: document.getElementById('wordStatus'),
+    };
+
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+      highlight(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+
+    function setCookie(name, value, days = 365) {
+      const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+      document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+    }
+
+    function getCookie(name) {
+      const target = `${encodeURIComponent(name)}=`;
+      var cookieItems = document.cookie.split('; ');
+      var foundItem = '';
+      for (var i = 0; i < cookieItems.length; i += 1) {
+        if (cookieItems[i].indexOf(target) === 0) {
+          foundItem = cookieItems[i].slice(target.length);
+          break;
+        }
+      }
+      return foundItem || '';
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function validateSimpleText(value) {
+      const normalized = value.trim();
+      if (!NAME_ROOM_REGEX.test(normalized)) return false;
+      const lower = normalized.toLowerCase();
+      return !state.bannedWords.some((word) => lower.includes(String(word).toLowerCase()));
+    }
+
+    function randomLetters(length) {
+      let output = '';
+      for (let i = 0; i < length; i += 1) {
+        output += LETTERS[Math.floor(Math.random() * LETTERS.length)];
+      }
+      return output;
+    }
+
+    function generateDefaultUsername() {
+      let candidate = `User${randomLetters(4)}`;
+      while (!validateSimpleText(candidate)) {
+        candidate = `User${randomLetters(4)}`;
+      }
+      return candidate;
+    }
+
+    function ensureUser() {
+      const existing = decodeURIComponent(getCookie('username') || '');
+      if (existing && validateSimpleText(existing)) {
+        state.username = existing;
+      } else {
+        state.username = generateDefaultUsername();
+        setCookie('username', state.username);
+      }
+
+      els.nicknameInput.value = state.username;
+      state.adminEnabled = decodeURIComponent(getCookie('admin') || '') === '1145';
+      els.adminPanel.classList.toggle('hidden', !state.adminEnabled);
+      updateHeader();
+    }
+
+    function showMessage(message, isError = false) {
+      els.messageBox.textContent = message;
+      els.messageBox.className = isError ? 'status-error' : 'status-ok';
+    }
+
+    function formatUptime(seconds) {
+      const day = Math.floor(seconds / 86400);
+      const hour = Math.floor((seconds % 86400) / 3600);
+      const minute = Math.floor((seconds % 3600) / 60);
+      return `${day}d ${hour}h ${minute}m`;
+    }
+
+    function updateLoadPanel() {
+      els.loadConnections.textContent = state.load.totalConnections;
+      els.loadRooms.textContent = state.load.activeRooms;
+      els.loadMemory.textContent = `${state.load.nodeMemoryMB} MB`;
+      els.loadHeap.textContent = `${state.load.heapUsedMB} MB`;
+      els.loadUptime.textContent = formatUptime(state.load.uptimeSeconds || 0);
+      els.loadAvg.textContent = (state.load.systemLoadAvg || [0, 0, 0]).join(' / ');
+      els.serverBadge.textContent = `服务器状态 · ${state.load.totalConnections} 在线 ▾`;
+    }
+
+    function renderMemberList() {
+      if (!state.currentRoomId || !state.memberNames.length) {
+        els.memberList.innerHTML = '<span class="muted">当前未进入协作房间。</span>';
+        return;
+      }
+
+      els.memberList.innerHTML = state.memberNames
+        .map((name) => `<span class="member-pill">${escapeHtml(name)}</span>`)
+        .join('');
+    }
+
+    function updateHeader() {
+      els.currentUserText.textContent = state.username || '-';
+      els.currentModeText.textContent = state.mode || '未选择';
+      els.currentRoomText.textContent = state.currentRoomId || '-';
+      els.memberStatus.textContent = `房间人数：${state.memberCount || '-'} / ${state.maxPerson || '-'}`;
+      els.roomLimitText.textContent = state.maxPerson || '-';
+      els.maxPersonHint.textContent = state.maxPerson || '-';
+      renderMemberList();
+      updateLoadPanel();
+    }
+
+    function setView(viewName) {
+      const viewMap = { welcome: els.welcomeView, lobby: els.lobbyView, editor: els.editorView };
+      Object.values(viewMap).forEach((view) => view.classList.remove('active'));
+      viewMap[viewName].classList.add('active');
+
+      if (viewName === 'welcome') {
+        els.viewTitle.textContent = '欢迎';
+        els.viewSubtitle.textContent = '选择使用单人模式或进入合作大厅。';
+      }
+      if (viewName === 'lobby') {
+        els.viewTitle.textContent = '合作模式大厅';
+        els.viewSubtitle.textContent = '创建新房间，或输入 Room ID 加入已有协作空间。';
+      }
+      if (viewName === 'editor') {
+        const title = state.mode === 'single' ? '单人编辑器' : `协作编辑器 · ${state.currentRoomId}`;
+        const subtitle = state.mode === 'single'
+          ? '内容保存在当前页面内存中，不会推送到服务器。'
+          : '本地渲染 Markdown，文本内容通过 Socket.io 向同房间其他成员同步。';
+        els.viewTitle.textContent = title;
+        els.viewSubtitle.textContent = subtitle;
+      }
+    }
+
+    function renderMarkdown(text) {
+      state.editorValue = text;
+      els.markdownInput.value = text;
+      els.preview.innerHTML = marked.parse(text || '');
+      els.preview.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+      els.wordStatus.textContent = `字符数：${text.length}`;
+    }
+
+    function applyFontSizes() {
+      document.documentElement.style.setProperty('--editor-font-size', `${els.editorFontSlider.value}px`);
+      document.documentElement.style.setProperty('--preview-font-size', `${els.previewFontSlider.value}px`);
+      els.editorFontValue.textContent = `${els.editorFontSlider.value}px`;
+      els.previewFontValue.textContent = `${els.previewFontSlider.value}px`;
+    }
+
+    function updateEditorButtons() {
+      const inCollab = state.mode === 'coop' && state.currentRoomId;
+      els.leaveRoomBtn.classList.toggle('hidden', !inCollab);
+      els.backToLobbyBtn.classList.toggle('hidden', state.mode !== 'coop');
+      els.deleteRoomBtn.classList.toggle('hidden', !(inCollab && state.isOwner));
+    }
+
+    function applySettings(settings) {
+      if (!settings) return;
+      state.maxPerson = settings.maxPerson || state.maxPerson;
+      state.bannedWords = Array.isArray(settings.bannedWords) ? settings.bannedWords : state.bannedWords;
+      els.adminMaxPersonInput.value = state.maxPerson;
+      els.adminBannedWordsInput.value = state.bannedWords.join(',');
+      updateHeader();
+    }
+
+    function applyOverview(load, settings) {
+      if (load) {
+        state.load = {
+          totalConnections: load.totalConnections || 0,
+          activeRooms: load.activeRooms || 0,
+          nodeMemoryMB: load.nodeMemoryMB || 0,
+          heapUsedMB: load.heapUsedMB || 0,
+          uptimeSeconds: load.uptimeSeconds || 0,
+          systemLoadAvg: load.systemLoadAvg || [0, 0, 0],
+        };
+      }
+      if (settings) {
+        applySettings(settings);
+      }
+      updateLoadPanel();
+    }
+
+    function enterSingleMode() {
+      state.mode = 'single';
+      state.currentRoomId = '';
+      state.currentRoomOwner = '';
+      state.isOwner = false;
+      state.memberCount = 0;
+      state.memberNames = [];
+      updateHeader();
+      updateEditorButtons();
+      els.syncStatus.textContent = '单人模式：仅本地编辑。';
+      renderMarkdown(state.editorValue);
+      setView('editor');
+      showMessage('已进入单人模式。');
+    }
+
+    function enterLobby() {
+      state.mode = 'coop';
+      state.currentRoomId = '';
+      state.currentRoomOwner = '';
+      state.isOwner = false;
+      state.memberCount = 0;
+      state.memberNames = [];
+      updateHeader();
+      updateEditorButtons();
+      setView('lobby');
+      showMessage('已进入合作模式大厅。');
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    }
+
+    function enterRoom(roomId, content, isOwner, owner, memberCount, memberNames, maxPerson) {
+      state.mode = 'coop';
+      state.currentRoomId = roomId;
+      state.currentRoomOwner = owner;
+      state.isOwner = !!isOwner;
+      state.memberCount = memberCount || 1;
+      state.memberNames = memberNames || [];
+      state.maxPerson = maxPerson || state.maxPerson;
+      updateHeader();
+      updateEditorButtons();
+      renderMarkdown(content);
+      els.syncStatus.textContent = `已连接房间 ${roomId}，协作同步已开启。`;
+      setView('editor');
+      showMessage(`已加入房间 ${roomId}。`);
+    }
+
+    async function loadRooms() {
+      const response = await fetch('/api/rooms');
+      const data = await response.json();
+      renderRoomList(data.rooms || []);
+      applyOverview(data.load, data.settings);
+    }
+
+    async function loadAdminRooms() {
+      if (!state.adminEnabled) return;
+      const adminCode = encodeURIComponent(getCookie('admin'));
+      const response = await fetch(`/api/admin/rooms?admin=${adminCode}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      renderAdminRooms(data.rooms || []);
+      applyOverview(data.load, data.settings);
+    }
+
+    function renderRoomList(rooms) {
+      if (!rooms.length) {
+        els.roomList.innerHTML = '<div class="empty-state">当前暂无房间，创建第一个协作空间吧。</div>';
+        return;
+      }
+
+      els.roomList.innerHTML = rooms.map((room) => `
+        <article class="room-item">
+          <div><strong>${escapeHtml(room.roomId)}</strong></div>
+          <div class="room-meta">
+            <span>房主：${escapeHtml(room.owner)}</span>
+            <span>人数：${room.memberCount}/${room.maxPerson}</span>
+          </div>
+          <div class="row">
+            <button class="btn-primary" data-room-id="${escapeHtml(room.roomId)}" data-action="join">加入</button>
+            ${room.owner === state.username ? `<button class="btn-danger" data-room-id="${escapeHtml(room.roomId)}" data-action="delete">删除</button>` : ''}
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderAdminRooms(rooms) {
+      if (!rooms.length) {
+        els.adminRooms.innerHTML = '<div class="muted">当前没有活跃房间。</div>';
+        return;
+      }
+
+      els.adminRooms.innerHTML = rooms.map((room) => `
+        <div class="panel">
+          <strong>${escapeHtml(room.roomId)}</strong>
+          <div class="room-meta">
+            <span>房主：${escapeHtml(room.owner)}</span>
+            <span>人数：${room.memberCount}/${room.maxPerson}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveNickname() {
+      const value = els.nicknameInput.value.trim();
+      if (!validateSimpleText(value)) {
+        showMessage(`昵称仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        return;
+      }
+
+      state.username = value;
+      setCookie('username', value);
+      updateHeader();
+      showMessage('昵称已更新。');
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    }
+
+    async function saveAdminSettings() {
+      const adminCode = decodeURIComponent(getCookie('admin') || '');
+      const maxPerson = Number(els.adminMaxPersonInput.value);
+      const bannedWords = els.adminBannedWordsInput.value.split(',').map((item) => item.trim()).filter(Boolean);
+
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin: adminCode, maxPerson, bannedWords }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showMessage(data.message || '管理员设置保存失败。', true);
+        return;
+      }
+
+      applySettings(data.settings);
+      showMessage('管理员设置已更新。');
+      loadRooms();
+      loadAdminRooms();
+    }
+
+    function handleEditorInput(event) {
+      const value = event.target.value;
+      renderMarkdown(value);
+
+      if (state.mode === 'coop' && state.currentRoomId && !state.isApplyingRemote) {
+        socket.emit('sync-content', { roomId: state.currentRoomId, content: value });
+        els.syncStatus.textContent = `已同步到房间 ${state.currentRoomId}。`;
+      }
+    }
+
+    function attachDividerDrag() {
+      let dragging = false;
+      function onMove(event) {
+        if (!dragging || window.innerWidth <= 860) return;
+        const rect = els.paneWrap.getBoundingClientRect();
+        const ratio = ((event.clientX - rect.left) / rect.width) * 100;
+        const next = Math.max(20, Math.min(80, ratio));
+        document.documentElement.style.setProperty('--editor-width', `${next}%`);
+      }
+      els.divider.addEventListener('mousedown', () => {
+        dragging = true;
+        document.body.style.userSelect = 'none';
+      });
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', () => {
+        dragging = false;
+        document.body.style.userSelect = '';
+      });
+    }
+
+    els.serverBadge.addEventListener('click', () => {
+      els.serverBadgePanel.classList.toggle('hidden');
+    });
+    els.saveNicknameBtn.addEventListener('click', saveNickname);
+    els.refreshRoomsBtn.addEventListener('click', () => {
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+      showMessage('房间列表已刷新。');
+    });
+    els.singleModeBtn.addEventListener('click', enterSingleMode);
+    els.coopModeBtn.addEventListener('click', enterLobby);
+    els.saveAdminSettingsBtn.addEventListener('click', saveAdminSettings);
+
+    els.createRoomBtn.addEventListener('click', () => {
+      const roomId = els.createRoomInput.value.trim();
+      if (!validateSimpleText(roomId)) {
+        showMessage(`房间号仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        return;
+      }
+      socket.emit('create-room', { username: state.username, roomId });
+    });
+
+    els.joinRoomBtn.addEventListener('click', () => {
+      const roomId = els.joinRoomInput.value.trim();
+      if (!validateSimpleText(roomId)) {
+        showMessage(`房间号仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        return;
+      }
+      socket.emit('join-room', { username: state.username, roomId });
+    });
+
+    els.roomList.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-room-id]');
+      if (!button) return;
+      const roomId = button.dataset.roomId;
+      const action = button.dataset.action;
+      if (action === 'join') socket.emit('join-room', { username: state.username, roomId });
+      if (action === 'delete') socket.emit('delete-room', { username: state.username, roomId });
+    });
+
+    els.backToLobbyBtn.addEventListener('click', enterLobby);
+    els.leaveRoomBtn.addEventListener('click', () => {
+      socket.emit('leave-room');
+      enterLobby();
+    });
+    els.deleteRoomBtn.addEventListener('click', () => {
+      if (!state.currentRoomId) return;
+      socket.emit('delete-room', { username: state.username, roomId: state.currentRoomId });
+    });
+    els.editorFontSlider.addEventListener('input', applyFontSizes);
+    els.previewFontSlider.addEventListener('input', applyFontSizes);
+    els.markdownInput.addEventListener('input', handleEditorInput);
+
+    socket.on('action-error', ({ message }) => {
+      showMessage(message || '操作失败。', true);
+    });
+
+    socket.on('room-created', ({ room }) => {
+      showMessage(`房间 ${room.roomId} 创建成功。`);
+      els.createRoomInput.value = '';
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    });
+
+    socket.on('rooms-updated', ({ rooms }) => {
+      renderRoomList(rooms || []);
+      if (state.adminEnabled) renderAdminRooms(rooms || []);
+    });
+
+    socket.on('room-joined', ({ room, content, isOwner, memberNames, maxPerson }) => {
+      enterRoom(room.roomId, content, isOwner, room.owner, room.memberCount, memberNames, maxPerson);
+    });
+
+    socket.on('room-presence', ({ roomId, memberCount, memberNames, maxPerson }) => {
+      if (roomId === state.currentRoomId) {
+        state.memberCount = memberCount;
+        state.memberNames = memberNames || [];
+        state.maxPerson = maxPerson || state.maxPerson;
+        updateHeader();
+      }
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    });
+
+    socket.on('settings-updated', (settings) => {
+      applySettings(settings);
+    });
+
+    socket.on('system-overview', ({ load, settings }) => {
+      applyOverview(load, settings);
+    });
+
+    socket.on('remote-content', ({ roomId, content, updatedBy }) => {
+      if (roomId !== state.currentRoomId) return;
+      state.isApplyingRemote = true;
+      renderMarkdown(content);
+      state.isApplyingRemote = false;
+      els.syncStatus.textContent = `${updatedBy || '其他成员'} 刚刚更新了内容。`;
+    });
+
+    socket.on('room-deleted', ({ roomId }) => {
+      if (roomId === state.currentRoomId) {
+        state.currentRoomId = '';
+        state.isOwner = false;
+        state.memberCount = 0;
+        state.memberNames = [];
+        updateHeader();
+        updateEditorButtons();
+        enterLobby();
+        showMessage(`房间 ${roomId} 已被删除。`, true);
+      }
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    });
+
+    socket.on('room-removed', ({ roomId }) => {
+      if (roomId === state.currentRoomId) enterLobby();
+      showMessage(`房间 ${roomId} 已删除。`);
+      loadRooms();
+      if (state.adminEnabled) loadAdminRooms();
+    });
+
+    ensureUser();
+    applyFontSizes();
+    renderMarkdown(state.editorValue);
+    attachDividerDrag();
+    loadRooms();
+    if (state.adminEnabled) loadAdminRooms();
+    updateEditorButtons();
+    updateHeader();
+  </script>
+</body>
+</html>
