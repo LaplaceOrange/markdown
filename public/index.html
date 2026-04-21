@@ -11,15 +11,18 @@
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
-      --line: rgba(255, 255, 255, 0.12);
-      --text: #f3f4f6;
-      --muted: #9aa3b2;
-      --accent: #62d0ff;
-      --accent-strong: #2d9cdb;
-      --ink: #1f2937;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-soft: rgba(15, 23, 42, 0.08);
+      --text: #f5f7fb;
+      --muted: #94a3b8;
+      --accent: #8fb3ff;
+      --accent-strong: #5d82f6;
+      --ink: #172033;
       --danger: #ff6b6b;
       --success: #46d39a;
-      --shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      --shadow: 0 24px 64px rgba(2, 6, 23, 0.18);
+      --panel-dark: rgba(255, 255, 255, 0.035);
+      --panel-light: rgba(255, 255, 255, 0.78);
       --editor-font-size: 16px;
       --preview-font-size: 16px;
       --editor-width: 50%;
@@ -31,43 +34,43 @@
       margin: 0;
       min-height: 100%;
       background:
-        radial-gradient(circle at top left, rgba(98, 208, 255, 0.12), transparent 32%),
-        radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 25%),
-        linear-gradient(135deg, #0d1015 0%, #151a22 45%, #0d1015 100%);
+        radial-gradient(circle at top left, rgba(143, 179, 255, 0.1), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.05), transparent 26%),
+        linear-gradient(145deg, #0a0d14 0%, #101521 52%, #0c1118 100%);
       color: var(--text);
       font-family: 'Outfit', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     }
 
-    body { padding: 24px; }
+    body { padding: 18px; }
 
     .app-shell {
-      min-height: calc(100vh - 48px);
+      min-height: calc(100vh - 36px);
       display: grid;
-      grid-template-columns: 340px minmax(0, 1fr);
-      border: 1px solid var(--line);
-      border-radius: 24px;
+      grid-template-columns: 316px minmax(0, 1fr);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 22px;
       overflow: hidden;
       box-shadow: var(--shadow);
-      -webkit-backdrop-filter: blur(20px);
-      backdrop-filter: blur(20px);
-      background: rgba(11, 14, 19, 0.68);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      background: rgba(8, 12, 18, 0.78);
     }
 
     .sidebar {
-      padding: 28px;
-      background: linear-gradient(180deg, rgba(10, 13, 18, 0.96), rgba(19, 25, 34, 0.92));
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(8, 12, 18, 0.98), rgba(15, 20, 30, 0.96));
       border-right: 1px solid var(--line);
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 16px;
       overflow: auto;
     }
 
     .brand h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: 30px;
       font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
     }
 
     .brand p,
@@ -87,33 +90,34 @@
     }
 
     .brand p {
-      margin: 10px 0 0;
-      line-height: 1.6;
-      font-size: 14px;
+      margin: 8px 0 0;
+      line-height: 1.7;
+      font-size: 13px;
     }
 
-    .stack { display: flex; flex-direction: column; gap: 14px; }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; }
 
     .panel {
-      padding: 18px;
+      padding: 16px;
       border: 1px solid var(--line);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      background: var(--panel-dark);
     }
 
     .panel h2, .panel h3 {
-      margin: 0 0 10px;
-      font-size: 16px;
+      margin: 0 0 8px;
+      font-size: 15px;
       font-weight: 600;
+      letter-spacing: 0.02em;
     }
 
     label {
-      font-size: 13px;
+      font-size: 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      color: #dce2ea;
+      gap: 7px;
+      color: #dbe4ef;
     }
 
     input[type="text"], input[type="number"], textarea, button {
@@ -122,12 +126,12 @@
 
     input[type="text"], input[type="number"] {
       width: 100%;
-      height: 44px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.05);
+      height: 42px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--text);
-      padding: 0 14px;
+      padding: 0 13px;
       outline: none;
       transition: border-color 0.2s ease, transform 0.2s ease;
     }
@@ -140,39 +144,41 @@
     }
 
     button {
-      min-height: 42px;
-      padding: 10px 16px;
+      min-height: 40px;
+      padding: 9px 15px;
       border-radius: 999px;
       border: 1px solid transparent;
       cursor: pointer;
       transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+      font-weight: 600;
     }
 
     button:hover { transform: translateY(-1px); }
     button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent), #8ce2ff);
-      color: #091018;
+      background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+      color: #f8fbff;
       font-weight: 700;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.045);
+      border-color: rgba(255, 255, 255, 0.1);
       color: var(--text);
     }
 
     .btn-danger {
-      background: rgba(255, 107, 107, 0.12);
-      border-color: rgba(255, 107, 107, 0.28);
-      color: #ffd3d3;
+      background: rgba(255, 107, 107, 0.1);
+      border-color: rgba(255, 107, 107, 0.24);
+      color: #ffd7d7;
     }
 
     .mode-actions button { flex: 1; }
 
     .content-area {
-      background: linear-gradient(180deg, rgba(246, 248, 251, 0.95), rgba(237, 241, 246, 0.97));
+      background: linear-gradient(180deg, rgba(244, 247, 251, 0.94), rgba(235, 240, 246, 0.98));
       color: var(--ink);
       display: flex;
       flex-direction: column;
@@ -181,28 +187,28 @@
     }
 
     .topbar {
-      padding: 20px 24px;
-      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line-soft);
       display: flex;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
       align-items: flex-start;
       flex-wrap: wrap;
-      background: rgba(255, 255, 255, 0.7);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.62);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
     }
 
     .topbar h2 {
       margin: 0;
-      font-size: 24px;
+      font-size: 26px;
       font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
       color: #0f172a;
     }
 
     .topbar p {
-      margin: 6px 0 0;
-      font-size: 13px;
+      margin: 5px 0 0;
+      font-size: 12px;
       color: #64748b;
     }
 
@@ -211,51 +217,52 @@
     .view { display: none; height: 100%; }
     .view.active { display: block; }
 
-    .welcome-view, .lobby-view { padding: 28px; }
+    .welcome-view, .lobby-view { padding: 22px; }
 
     .hero-card, .lobby-grid, .editor-shell {
-      height: calc(100vh - 145px);
+      height: calc(100vh - 132px);
       min-height: 620px;
     }
 
     .hero-card {
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      border-radius: 28px;
-      padding: 36px;
+      border: 1px solid var(--line-soft);
+      border-radius: 24px;
+      padding: 34px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.98)),
-        linear-gradient(120deg, rgba(98, 208, 255, 0.1), transparent);
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 244, 249, 0.98)),
+        linear-gradient(120deg, rgba(143, 179, 255, 0.06), transparent);
       display: grid;
       align-items: center;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
     }
 
     .hero-card h3 {
       margin: 0;
-      font-size: 38px;
-      line-height: 1.25;
+      font-size: 42px;
+      line-height: 1.18;
       color: #0f172a;
       font-family: 'Noto Serif SC', serif;
+      max-width: 820px;
     }
 
     .hero-card p {
-      max-width: 720px;
-      font-size: 16px;
-      line-height: 1.8;
+      max-width: 760px;
+      font-size: 15px;
+      line-height: 1.9;
       color: #475569;
     }
 
     .hero-tips {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
+      gap: 12px;
     }
 
     .hero-tip, .overview-card, .member-panel {
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(15, 23, 42, 0.04);
-      border: 1px solid rgba(15, 23, 42, 0.08);
+      padding: 15px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.03);
+      border: 1px solid var(--line-soft);
     }
 
     .hero-tip strong, .overview-card strong {
@@ -266,58 +273,58 @@
 
     .lobby-grid {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
-      gap: 20px;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 16px;
     }
 
     .card {
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.84);
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      padding: 22px;
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+      border-radius: 20px;
+      background: var(--panel-light);
+      border: 1px solid var(--line-soft);
+      padding: 20px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
       min-width: 0;
     }
 
     .card h3 {
-      margin: 0 0 12px;
-      font-size: 18px;
+      margin: 0 0 10px;
+      font-size: 17px;
       color: #0f172a;
     }
 
     .card p {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
       line-height: 1.7;
-      font-size: 14px;
+      font-size: 13px;
       color: #64748b;
     }
 
     .room-list {
       display: grid;
-      gap: 14px;
+      gap: 12px;
       max-height: calc(100vh - 250px);
       overflow: auto;
       padding-right: 4px;
     }
 
     .room-item {
-      padding: 16px;
-      border-radius: 18px;
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      background: rgba(247, 250, 252, 0.94);
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid var(--line-soft);
+      background: rgba(248, 250, 252, 0.92);
       display: grid;
-      gap: 12px;
+      gap: 10px;
     }
 
     .room-item strong {
-      font-size: 16px;
+      font-size: 15px;
       color: #0f172a;
     }
 
     .room-meta {
-      font-size: 13px;
+      font-size: 12px;
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
@@ -332,43 +339,43 @@
     .editor-toolbar, .status-bar {
       display: flex;
       justify-content: space-between;
-      gap: 16px;
+      gap: 12px;
       flex-wrap: wrap;
-      padding: 16px 20px;
-      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-      background: rgba(255, 255, 255, 0.68);
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(255, 255, 255, 0.58);
     }
 
     .status-bar {
-      border-top: 1px solid rgba(15, 23, 42, 0.08);
+      border-top: 1px solid var(--line-soft);
       border-bottom: none;
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .controls {
       display: flex;
-      gap: 16px;
+      gap: 10px;
       align-items: center;
       flex-wrap: wrap;
     }
 
     .control-chip, .status-badge {
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
-      background: rgba(15, 23, 42, 0.04);
+      background: rgba(255, 255, 255, 0.44);
       border: 1px solid rgba(15, 23, 42, 0.08);
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       color: #334155;
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .status-stack {
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       align-items: flex-end;
     }
 
@@ -381,17 +388,17 @@
     .status-badge-panel {
       min-width: 280px;
       max-width: 360px;
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(15, 23, 42, 0.1);
-      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+      padding: 15px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(15, 23, 42, 0.09);
+      box-shadow: 0 16px 30px rgba(15, 23, 42, 0.1);
     }
 
     .load-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
     .load-grid strong {
@@ -409,16 +416,259 @@
     .member-list {
       display: flex;
       flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .admin-layout {
+      display: grid;
+      gap: 12px;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .admin-section {
+      padding: 15px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
       gap: 10px;
     }
 
-    .member-pill {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(98, 208, 255, 0.1);
-      border: 1px solid rgba(98, 208, 255, 0.18);
+    .admin-section h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #172033;
+      letter-spacing: 0.02em;
+    }
+
+    .admin-status-card {
+      padding: 14px 15px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(243, 246, 251, 0.98));
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .admin-status-card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #172033;
+    }
+
+    .admin-status-card.status-ok {
+      border-color: rgba(22, 163, 74, 0.2);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(255, 255, 255, 0.96));
+    }
+
+    .admin-status-card.status-ok strong {
+      color: #15803d;
+    }
+
+    .admin-status-card.status-error {
+      border-color: rgba(220, 38, 38, 0.18);
+      background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(255, 255, 255, 0.96));
+    }
+
+    .admin-status-card.status-error strong {
+      color: #b91c1c;
+    }
+
+    .admin-status-card .admin-note {
+      color: #64748b;
+    }
+
+    .admin-room-list {
+      display: grid;
+      gap: 10px;
+      max-height: 240px;
+      overflow: auto;
+    }
+
+    .admin-room-card {
+      padding: 12px 13px;
+      border-radius: 14px;
+      background: rgba(248, 250, 252, 0.9);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .admin-room-card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #172033;
+    }
+
+    .admin-view {
+      padding: 22px;
+      height: 100%;
+    }
+
+    .admin-shell {
+      min-height: calc(100vh - 132px);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 16px;
+    }
+
+    .admin-hero {
+      padding: 24px 26px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 244, 249, 0.98));
+      border: 1px solid var(--line-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .admin-hero h3 {
+      margin: 0;
+      font-size: 28px;
       color: #0f172a;
+      font-family: 'Noto Serif SC', serif;
+    }
+
+    .admin-hero p {
+      margin: 8px 0 0;
+      color: #64748b;
+      line-height: 1.8;
+      max-width: 760px;
+    }
+
+    .admin-shell-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      align-items: start;
+      min-height: 0;
+    }
+
+    .admin-main-card,
+    .admin-side-card {
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid var(--line-soft);
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
+      padding: 20px;
+      min-width: 0;
+    }
+
+    .admin-main-card {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .admin-side-stack {
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .admin-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .admin-card-head h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #0f172a;
+    }
+
+    .admin-card-head p {
+      margin: 6px 0 0;
+      color: #64748b;
       font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .admin-view .room-meta,
+    .admin-view .muted,
+    .admin-view small,
+    .admin-view label,
+    .admin-view p,
+    .admin-view span {
+      color: #64748b;
+    }
+
+    .admin-view input[type="text"],
+    .admin-view input[type="number"] {
+      background: rgba(248, 250, 252, 0.96);
+      border-color: rgba(15, 23, 42, 0.1);
+      color: #172033;
+    }
+
+    .admin-view input[type="text"]::placeholder,
+    .admin-view input[type="number"]::placeholder {
+      color: #94a3b8;
+    }
+
+    #lobbyView input[type="text"] {
+      color: #0f172a;
+    }
+
+    #lobbyView input[type="text"]::placeholder {
+      color: #64748b;
+    }
+
+    .admin-room-list {
+      max-height: none;
+      overflow: auto;
+      align-content: start;
+    }
+
+    .admin-room-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .admin-room-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .admin-player-list {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .admin-player-card {
+      padding: 12px 13px;
+      border-radius: 14px;
+      background: rgba(248, 250, 252, 0.9);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      display: grid;
+      gap: 10px;
+    }
+
+    .admin-player-card strong {
+      color: #172033;
+    }
+
+    .editor-pane.is-readonly {
+      opacity: 0.82;
+    }
+
+    .member-pill {
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(143, 179, 255, 0.08);
+      border: 1px solid rgba(143, 179, 255, 0.18);
+      color: #ffffff;
+      font-size: 12px;
     }
 
     input[type="range"] {
@@ -432,13 +682,13 @@
     }
 
     .pane { min-width: 0; overflow: auto; height: 100%; }
-    .editor-pane { width: var(--editor-width); background: #0f1720; color: #e2e8f0; }
-    .preview-pane { flex: 1; background: #ffffff; }
+    .editor-pane { width: var(--editor-width); background: linear-gradient(180deg, #0d1420, #101827); color: #e2e8f0; }
+    .preview-pane { flex: 1; background: linear-gradient(180deg, #ffffff, #fbfcfe); }
 
     .divider {
       width: 10px;
       cursor: col-resize;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.08));
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.05), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.05));
       position: relative;
       flex: 0 0 10px;
     }
@@ -446,11 +696,11 @@
     .divider::after {
       content: '';
       position: absolute;
-      inset: 50% 2px auto 2px;
-      height: 54px;
+      inset: 50% 3px auto 3px;
+      height: 48px;
       transform: translateY(-50%);
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.34);
     }
 
     #markdownInput {
@@ -461,8 +711,8 @@
       outline: none;
       background: transparent;
       color: inherit;
-      padding: 24px;
-      line-height: 1.75;
+      padding: 22px;
+      line-height: 1.8;
       font-size: var(--editor-font-size);
       font-family: 'Consolas', 'Courier New', monospace;
     }
@@ -470,8 +720,8 @@
     #preview {
       height: 100%;
       overflow: auto;
-      padding: 28px 32px 40px;
-      line-height: 1.85;
+      padding: 24px 28px 36px;
+      line-height: 1.9;
       font-size: var(--preview-font-size);
       color: #1f2937;
       font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
@@ -486,9 +736,9 @@
     }
 
     #preview pre {
-      border-radius: 18px;
+      border-radius: 16px;
       overflow: auto;
-      padding: 18px;
+      padding: 16px;
       background: #0b1220;
     }
 
@@ -509,7 +759,7 @@
     .watermark {
       position: fixed;
       left: 50%;
-      bottom: 16px;
+      bottom: 14px;
       transform: translateX(-50%);
       text-decoration: none;
       font-size: 12px;
@@ -525,15 +775,17 @@
     .hidden { display: none !important; }
 
     @media (max-width: 1200px) {
-      .app-shell, .lobby-grid { grid-template-columns: 1fr; }
+      .app-shell, .lobby-grid, .admin-shell-grid { grid-template-columns: 1fr; }
       .sidebar { border-right: none; border-bottom: 1px solid var(--line); }
       .hero-tips { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 860px) {
-      body { padding: 12px; }
-      .app-shell { min-height: calc(100vh - 24px); }
-      .hero-card, .lobby-grid, .editor-shell { height: auto; min-height: 0; }
+      body { padding: 10px; }
+      .app-shell { min-height: calc(100vh - 20px); border-radius: 18px; }
+      .sidebar, .welcome-view, .lobby-view, .admin-view { padding: 16px; }
+      .hero-card, .lobby-grid, .editor-shell, .admin-shell { height: auto; min-height: 0; }
+      .admin-grid { grid-template-columns: 1fr; }
       .editor-pane-wrap { flex-direction: column; }
       .editor-pane, .preview-pane { width: 100%; height: 50vh; }
       .divider { width: 100%; height: 10px; cursor: row-resize; }
@@ -561,7 +813,7 @@
           <button id="saveNicknameBtn" class="btn-primary">保存昵称</button>
           <button id="refreshRoomsBtn" class="btn-secondary">刷新房间</button>
         </div>
-        <p class="helper-text">首次访问会自动生成默认账号。仅允许中英文，最长 20 字，不可包含违禁词。</p>
+        <p class="helper-text">首次访问会自动生成默认账号。仅允许数字、中英文，最长 20 字，不可包含违禁词。</p>
       </section>
 
       <section class="panel stack">
@@ -571,21 +823,6 @@
           <button id="coopModeBtn" class="btn-secondary">合作模式</button>
         </div>
         <p class="helper-text">单人模式仅保存在当前页面内存；合作模式进入房间大厅。</p>
-      </section>
-
-      <section id="adminPanel" class="panel stack hidden">
-        <h2>管理员面板</h2>
-        <p class="admin-note">检测到 Cookie 中存在管理员暗号，可查看活跃房间并修改人数上限、违禁词。</p>
-        <label>
-          房间最大在线人数
-          <input id="adminMaxPersonInput" type="number" min="1" max="100" />
-        </label>
-        <label>
-          违禁词（英文逗号分隔）
-          <input id="adminBannedWordsInput" type="text" placeholder="例如：78,91,sb" />
-        </label>
-        <button id="saveAdminSettingsBtn" class="btn-primary">保存管理员设置</button>
-        <div id="adminRooms" class="stack"></div>
       </section>
 
       <section class="panel stack">
@@ -660,7 +897,7 @@
             </div>
             <label>
               Room ID
-              <input id="createRoomInput" type="text" maxlength="20" placeholder="仅中英文，最长 20 字" />
+              <input id="createRoomInput" type="text" maxlength="20" placeholder="仅数字、中英文，最长 20 字" />
             </label>
             <button id="createRoomBtn" class="btn-primary">创建房间</button>
             <div>
@@ -728,6 +965,69 @@ console.log('hello');
           </div>
         </div>
       </section>
+
+      <section id="adminView" class="view admin-view">
+        <div class="admin-shell">
+          <div class="admin-hero">
+            <div>
+              <h3>管理员总览</h3>
+              <p id="adminHeroNote">集中查看服务器负载、系统属性与全部活跃房间，并可直接删除任意房间。</p>
+            </div>
+            <div class="admin-status-card">
+              <strong id="adminStatusTitle" color="red">管理员未登录</strong>
+              <div id="adminStatusNote" class="admin-note">请登录管理员账户。</div>
+            </div>
+          </div>
+          <div class="admin-shell-grid">
+            <section class="admin-main-card">
+              <div class="admin-card-head">
+                <div>
+                  <h3>全部房间</h3>
+                  <p>管理员可查看当前所有房间，并删除任意一个房间。</p>
+                </div>
+              </div>
+              <div id="adminRooms" class="admin-room-list"></div>
+            </section>
+            <div class="admin-side-stack">
+              <section class="admin-side-card admin-section">
+                <h3>服务器负载</h3>
+                <div class="load-grid">
+                  <div><small>在线连接</small><strong id="adminLoadConnections">0</strong></div>
+                  <div><small>活跃房间</small><strong id="adminLoadRooms">0</strong></div>
+                  <div><small>Node 内存</small><strong id="adminLoadMemory">0 MB</strong></div>
+                  <div><small>Heap 已用</small><strong id="adminLoadHeap">0 MB</strong></div>
+                  <div><small>运行时长</small><strong id="adminLoadUptime">0s</strong></div>
+                  <div><small>系统负载</small><strong id="adminLoadAvg">0 / 0 / 0</strong></div>
+                </div>
+              </section>
+              <section class="admin-side-card admin-section">
+                <h3>属性设置</h3>
+                <label>
+                  房间最大在线人数
+                  <input id="adminMaxPersonInput" type="number" min="1" max="100" />
+                </label>
+                <label>
+                  违禁词（英文逗号分隔）
+                  <input id="adminBannedWordsInput" type="text" placeholder="例如：78,91,sb" />
+                </label>
+                <label>
+                  已封禁玩家（英文逗号分隔）
+                  <input id="adminBannedPlayersInput" type="text" placeholder="例如：player01,测试用户" />
+                </label>
+                <label>
+                  新管理员暗号（数字/字母）
+                  <input id="adminCodeInput" type="text" placeholder="留空则不修改" />
+                </label>
+                <button id="saveAdminSettingsBtn" class="btn-primary">保存管理员设置</button>
+              </section>
+              <section class="admin-side-card admin-section">
+                <h3>在线玩家</h3>
+                <div id="adminPlayers" class="admin-player-list"></div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -735,7 +1035,7 @@ console.log('hello');
 
   <script>
     const socket = io();
-    const NAME_ROOM_REGEX = /^[A-Za-z\u4e00-\u9fa5]{1,20}$/;
+    const NAME_ROOM_REGEX = /^[A-Za-z0-9\u4e00-\u9fa5]{1,20}$/;
     const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const state = {
       username: '',
@@ -746,10 +1046,14 @@ console.log('hello');
       editorValue: '# 欢迎使用 Markdown 在线预览\n\n- 单人模式：仅本地编辑\n- 合作模式：进入房间与他人实时协作\n\n```js\nconsole.log("Markdown Lab");\n```',
       isApplyingRemote: false,
       adminEnabled: false,
+      adminRoute: window.location.pathname === '/admin',
+      isBanned: false,
       memberCount: 0,
       memberNames: [],
       maxPerson: 5,
       bannedWords: ['78', '91', 'sb'],
+      bannedPlayers: [],
+      onlineUsers: [],
       load: {
         totalConnections: 0,
         activeRooms: 0,
@@ -768,9 +1072,20 @@ console.log('hello');
       coopModeBtn: document.getElementById('coopModeBtn'),
       adminPanel: document.getElementById('adminPanel'),
       adminRooms: document.getElementById('adminRooms'),
+      adminStatusTitle: document.getElementById('adminStatusTitle'),
+      adminStatusNote: document.getElementById('adminStatusNote'),
       adminMaxPersonInput: document.getElementById('adminMaxPersonInput'),
       adminBannedWordsInput: document.getElementById('adminBannedWordsInput'),
+      adminBannedPlayersInput: document.getElementById('adminBannedPlayersInput'),
+      adminCodeInput: document.getElementById('adminCodeInput'),
+      adminPlayers: document.getElementById('adminPlayers'),
       saveAdminSettingsBtn: document.getElementById('saveAdminSettingsBtn'),
+      adminLoadConnections: document.getElementById('adminLoadConnections'),
+      adminLoadRooms: document.getElementById('adminLoadRooms'),
+      adminLoadMemory: document.getElementById('adminLoadMemory'),
+      adminLoadHeap: document.getElementById('adminLoadHeap'),
+      adminLoadUptime: document.getElementById('adminLoadUptime'),
+      adminLoadAvg: document.getElementById('adminLoadAvg'),
       memberList: document.getElementById('memberList'),
       messageBox: document.getElementById('messageBox'),
       viewTitle: document.getElementById('viewTitle'),
@@ -789,6 +1104,8 @@ console.log('hello');
       welcomeView: document.getElementById('welcomeView'),
       lobbyView: document.getElementById('lobbyView'),
       editorView: document.getElementById('editorView'),
+      adminView: document.getElementById('adminView'),
+      adminHeroNote: document.getElementById('adminHeroNote'),
       maxPersonHint: document.getElementById('maxPersonHint'),
       createRoomInput: document.getElementById('createRoomInput'),
       joinRoomInput: document.getElementById('joinRoomInput'),
@@ -804,6 +1121,7 @@ console.log('hello');
       deleteRoomBtn: document.getElementById('deleteRoomBtn'),
       backToLobbyBtn: document.getElementById('backToLobbyBtn'),
       markdownInput: document.getElementById('markdownInput'),
+      editorPane: document.querySelector('.editor-pane'),
       preview: document.getElementById('preview'),
       divider: document.getElementById('divider'),
       paneWrap: document.getElementById('paneWrap'),
@@ -841,6 +1159,14 @@ console.log('hello');
       return foundItem || '';
     }
 
+    function deleteCookie(name) {
+      document.cookie = `${encodeURIComponent(name)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
+
+    function encodeBase64(value) {
+      return btoa(unescape(encodeURIComponent(value)));
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replace(/&/g, '&amp;')
@@ -857,34 +1183,21 @@ console.log('hello');
       return !state.bannedWords.some((word) => lower.includes(String(word).toLowerCase()));
     }
 
-    function randomLetters(length) {
-      let output = '';
-      for (let i = 0; i < length; i += 1) {
-        output += LETTERS[Math.floor(Math.random() * LETTERS.length)];
-      }
-      return output;
-    }
-
-    function generateDefaultUsername() {
-      let candidate = `User${randomLetters(4)}`;
-      while (!validateSimpleText(candidate)) {
-        candidate = `User${randomLetters(4)}`;
-      }
-      return candidate;
-    }
-
-    function ensureUser() {
+    async function ensureUser() {
       const existing = decodeURIComponent(getCookie('username') || '');
       if (existing && validateSimpleText(existing)) {
         state.username = existing;
       } else {
-        state.username = generateDefaultUsername();
+        const response = await fetch('/api/identity');
+        const data = await response.json();
+        if (!response.ok || !validateSimpleText(data.username || '')) {
+          throw new Error(data.message || '获取账户信息失败。');
+        }
+        state.username = data.username;
         setCookie('username', state.username);
       }
 
       els.nicknameInput.value = state.username;
-      state.adminEnabled = decodeURIComponent(getCookie('admin') || '') === '1145';
-      els.adminPanel.classList.toggle('hidden', !state.adminEnabled);
       updateHeader();
     }
 
@@ -908,6 +1221,38 @@ console.log('hello');
       els.loadUptime.textContent = formatUptime(state.load.uptimeSeconds || 0);
       els.loadAvg.textContent = (state.load.systemLoadAvg || [0, 0, 0]).join(' / ');
       els.serverBadge.textContent = `服务器状态 · ${state.load.totalConnections} 在线 ▾`;
+      els.adminLoadConnections.textContent = state.load.totalConnections;
+      els.adminLoadRooms.textContent = state.load.activeRooms;
+      els.adminLoadMemory.textContent = `${state.load.nodeMemoryMB} MB`;
+      els.adminLoadHeap.textContent = `${state.load.heapUsedMB} MB`;
+      els.adminLoadUptime.textContent = formatUptime(state.load.uptimeSeconds || 0);
+      els.adminLoadAvg.textContent = (state.load.systemLoadAvg || [0, 0, 0]).join(' / ');
+    }
+
+    function updateAdminPanel() {
+      els.adminStatusTitle.textContent = state.adminEnabled ? '管理员已验证' : '管理员未验证';
+      els.adminStatusTitle.parentElement.classList.toggle('status-ok', state.adminEnabled);
+      els.adminStatusTitle.parentElement.classList.toggle('status-error', !state.adminEnabled);
+      if (state.adminEnabled) {
+        els.adminStatusNote.textContent = '当前已获得管理员权限，可以查看服务器负载、调整系统属性与审阅活跃房间。';
+        els.adminHeroNote.textContent = '集中查看服务器负载、系统属性与全部活跃房间，并可直接删除任意房间。';
+      } else if (state.adminRoute) {
+        els.adminStatusNote.textContent = '没有权限访问 /admin。请将用户名改为 admin，并输入正确的管理员暗号后再访问。';
+        els.adminHeroNote.textContent = '当前未通过管理员验证，管理员视图不可用。';
+      } else {
+        els.adminStatusNote.textContent = '将用户名修改为 admin 后输入管理员暗号，验证成功即可进入管理员模式。';
+        els.adminHeroNote.textContent = '集中查看服务器负载、系统属性与全部活跃房间，并可直接删除任意房间。';
+      }
+    }
+
+    function updateBanUi() {
+      els.createRoomBtn.disabled = state.isBanned;
+      els.markdownInput.readOnly = !!state.isBanned;
+      els.editorPane.classList.toggle('is-readonly', !!state.isBanned);
+
+      if (state.isBanned && state.mode === 'coop' && state.currentRoomId) {
+        els.syncStatus.textContent = '当前账号已被封禁，仅可查看房间内容。';
+      }
     }
 
     function renderMemberList() {
@@ -933,7 +1278,7 @@ console.log('hello');
     }
 
     function setView(viewName) {
-      const viewMap = { welcome: els.welcomeView, lobby: els.lobbyView, editor: els.editorView };
+      const viewMap = { welcome: els.welcomeView, lobby: els.lobbyView, editor: els.editorView, admin: els.adminView };
       Object.values(viewMap).forEach((view) => view.classList.remove('active'));
       viewMap[viewName].classList.add('active');
 
@@ -952,6 +1297,10 @@ console.log('hello');
           : '本地渲染 Markdown，文本内容通过 Socket.io 向同房间其他成员同步。';
         els.viewTitle.textContent = title;
         els.viewSubtitle.textContent = subtitle;
+      }
+      if (viewName === 'admin') {
+        els.viewTitle.textContent = '管理员入口';
+        els.viewSubtitle.textContent = state.adminEnabled ? '管理员面板已加载。' : '未通过管理员验证，当前无权限访问。';
       }
     }
 
@@ -980,9 +1329,13 @@ console.log('hello');
     function applySettings(settings) {
       if (!settings) return;
       state.maxPerson = settings.maxPerson || state.maxPerson;
-      state.bannedWords = Array.isArray(settings.bannedWords) ? settings.bannedWords : state.bannedWords;
+      state.bannedWords = Array.isArray(settings.bannedWords)
+        ? settings.bannedWords.filter((word) => String(word).toLowerCase() !== 'admin')
+        : state.bannedWords.filter((word) => String(word).toLowerCase() !== 'admin');
+      state.bannedPlayers = Array.isArray(settings.bannedPlayers) ? settings.bannedPlayers : state.bannedPlayers;
       els.adminMaxPersonInput.value = state.maxPerson;
       els.adminBannedWordsInput.value = state.bannedWords.join(',');
+      els.adminBannedPlayersInput.value = state.bannedPlayers.join(',');
       updateHeader();
     }
 
@@ -1033,11 +1386,12 @@ console.log('hello');
       if (state.adminEnabled) loadAdminRooms();
     }
 
-    function enterRoom(roomId, content, isOwner, owner, memberCount, memberNames, maxPerson) {
+    function enterRoom(roomId, content, isOwner, owner, memberCount, memberNames, maxPerson, isBanned) {
       state.mode = 'coop';
       state.currentRoomId = roomId;
       state.currentRoomOwner = owner;
       state.isOwner = !!isOwner;
+      state.isBanned = !!isBanned;
       state.memberCount = memberCount || 1;
       state.memberNames = memberNames || [];
       state.maxPerson = maxPerson || state.maxPerson;
@@ -1057,13 +1411,22 @@ console.log('hello');
     }
 
     async function loadAdminRooms() {
-      if (!state.adminEnabled) return;
-      const adminCode = encodeURIComponent(getCookie('admin'));
-      const response = await fetch(`/api/admin/rooms?admin=${adminCode}`);
-      if (!response.ok) return;
+      const response = await fetch('/api/admin/rooms');
+      if (!response.ok) {
+        state.adminEnabled = false;
+        updateAdminPanel();
+        if (state.adminRoute) {
+          showMessage('没有权限访问管理员面板。', true);
+        }
+        return;
+      }
       const data = await response.json();
+      state.adminEnabled = true;
+      state.onlineUsers = Array.isArray(data.onlineUsers) ? data.onlineUsers : [];
       renderAdminRooms(data.rooms || []);
+      renderAdminPlayers(state.onlineUsers);
       applyOverview(data.load, data.settings);
+      updateAdminPanel();
     }
 
     function renderRoomList(rooms) {
@@ -1094,40 +1457,149 @@ console.log('hello');
       }
 
       els.adminRooms.innerHTML = rooms.map((room) => `
-        <div class="panel">
+        <div class="admin-room-card">
           <strong>${escapeHtml(room.roomId)}</strong>
           <div class="room-meta">
             <span>房主：${escapeHtml(room.owner)}</span>
             <span>人数：${room.memberCount}/${room.maxPerson}</span>
           </div>
+          <div class="admin-room-actions">
+            <button class="btn-danger" data-admin-room-id="${escapeHtml(room.roomId)}" data-admin-action="delete">删除房间</button>
+          </div>
         </div>
       `).join('');
     }
 
-    function saveNickname() {
-      const value = els.nicknameInput.value.trim();
-      if (!validateSimpleText(value)) {
-        showMessage(`昵称仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+    function renderAdminPlayers(players) {
+      if (!players.length) {
+        els.adminPlayers.innerHTML = '<div class="muted">当前没有在线玩家。</div>';
         return;
       }
 
-      state.username = value;
-      setCookie('username', value);
-      updateHeader();
-      showMessage('昵称已更新。');
+      els.adminPlayers.innerHTML = players.map((player) => {
+        const banned = state.bannedPlayers.includes(player);
+        return `
+          <div class="admin-player-card">
+            <strong>${escapeHtml(player)}</strong>
+            <div class="room-meta">
+              <span>${banned ? '状态：已封禁' : '状态：在线'}</span>
+            </div>
+            <div class="admin-room-actions">
+              ${banned ? '<span class="muted">已封禁</span>' : `<button class="btn-danger" data-admin-player="${escapeHtml(player)}" data-admin-player-action="ban">封禁玩家</button>`}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteAdminRoom(roomId) {
+      const response = await fetch(`/api/admin/rooms/${encodeURIComponent(roomId)}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showMessage(data.message || '删除房间失败。', true);
+        return;
+      }
+
+      showMessage(data.message || `房间 ${roomId} 已删除。`);
       loadRooms();
-      if (state.adminEnabled) loadAdminRooms();
+      loadAdminRooms();
+    }
+
+    async function banAdminPlayer(username) {
+      const response = await fetch('/api/admin/players/ban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showMessage(data.message || '封禁玩家失败。', true);
+        return;
+      }
+
+      state.onlineUsers = Array.isArray(data.onlineUsers) ? data.onlineUsers : state.onlineUsers;
+      applySettings(data.settings);
+      renderAdminPlayers(state.onlineUsers);
+      showMessage(data.message || `玩家 ${username} 已封禁。`);
+    }
+
+    async function saveNickname() {
+      const value = els.nicknameInput.value.trim();
+      if (!validateSimpleText(value)) {
+        showMessage(`昵称仅支持数字、中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        return;
+      }
+
+      let nextAdminEnabled = false;
+      if (value === 'admin') {
+        const secret = window.prompt('请输入管理员暗号（支持数字/字母）');
+        const normalizedSecret = typeof secret === 'string' ? secret.trim() : '';
+        if (!normalizedSecret || !/^[A-Za-z0-9]+$/.test(normalizedSecret)) {
+          showMessage('管理员暗号仅支持数字或字母。', true);
+          return;
+        }
+        setCookie('adminpass', encodeBase64(normalizedSecret));
+        const sessionResponse = await fetch('/api/admin/session');
+        if (!sessionResponse.ok) {
+          deleteCookie('adminpass');
+          state.adminEnabled = false;
+          updateAdminPanel();
+          showMessage('管理员暗号错误。', true);
+          return;
+        }
+        nextAdminEnabled = true;
+      } else {
+        deleteCookie('adminpass');
+      }
+
+      const response = await fetch('/api/identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: value }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !validateSimpleText(data.username || '')) {
+        showMessage(data.message || '昵称保存失败。', true);
+        return;
+      }
+
+      state.username = data.username;
+      setCookie('username', data.username);
+      state.adminEnabled = nextAdminEnabled;
+      socket.emit('register-user', { username: state.username });
+      updateHeader();
+      updateAdminPanel();
+      updateBanUi();
+      showMessage(nextAdminEnabled ? '管理员验证成功。' : '昵称已更新。');
+      loadRooms();
+      if (state.adminEnabled) {
+        loadAdminRooms();
+        if (state.adminRoute) {
+          setView('admin');
+        }
+      } else {
+        els.adminRooms.innerHTML = '<div class="muted">当前没有管理员数据。</div>';
+      }
     }
 
     async function saveAdminSettings() {
-      const adminCode = decodeURIComponent(getCookie('admin') || '');
       const maxPerson = Number(els.adminMaxPersonInput.value);
       const bannedWords = els.adminBannedWordsInput.value.split(',').map((item) => item.trim()).filter(Boolean);
+      const bannedPlayers = els.adminBannedPlayersInput.value.split(',').map((item) => item.trim()).filter(Boolean);
+      const adminCode = els.adminCodeInput.value.trim();
+
+      if (adminCode && !/^[A-Za-z0-9]+$/.test(adminCode)) {
+        showMessage('管理员暗号仅支持数字或字母。', true);
+        return;
+      }
 
       const response = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin: adminCode, maxPerson, bannedWords }),
+        body: JSON.stringify({ maxPerson, bannedWords, bannedPlayers, adminCode }),
       });
 
       const data = await response.json();
@@ -1137,6 +1609,10 @@ console.log('hello');
       }
 
       applySettings(data.settings);
+      if (adminCode) {
+        setCookie('adminpass', encodeBase64(adminCode));
+        els.adminCodeInput.value = '';
+      }
       showMessage('管理员设置已更新。');
       loadRooms();
       loadAdminRooms();
@@ -1147,6 +1623,10 @@ console.log('hello');
       renderMarkdown(value);
 
       if (state.mode === 'coop' && state.currentRoomId && !state.isApplyingRemote) {
+        if (state.isBanned) {
+          els.syncStatus.textContent = '当前账号已被封禁，仅可查看房间内容。';
+          return;
+        }
         socket.emit('sync-content', { roomId: state.currentRoomId, content: value });
         els.syncStatus.textContent = `已同步到房间 ${state.currentRoomId}。`;
       }
@@ -1188,7 +1668,7 @@ console.log('hello');
     els.createRoomBtn.addEventListener('click', () => {
       const roomId = els.createRoomInput.value.trim();
       if (!validateSimpleText(roomId)) {
-        showMessage(`房间号仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        showMessage(`房间号仅支持数字、中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
         return;
       }
       socket.emit('create-room', { username: state.username, roomId });
@@ -1197,7 +1677,7 @@ console.log('hello');
     els.joinRoomBtn.addEventListener('click', () => {
       const roomId = els.joinRoomInput.value.trim();
       if (!validateSimpleText(roomId)) {
-        showMessage(`房间号仅支持中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
+        showMessage(`房间号仅支持数字、中英文，长度不能超过 20，且不能包含违禁词：${state.bannedWords.join('、')}`, true);
         return;
       }
       socket.emit('join-room', { username: state.username, roomId });
@@ -1210,6 +1690,22 @@ console.log('hello');
       const action = button.dataset.action;
       if (action === 'join') socket.emit('join-room', { username: state.username, roomId });
       if (action === 'delete') socket.emit('delete-room', { username: state.username, roomId });
+    });
+
+    els.adminRooms.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-admin-room-id]');
+      if (!button) return;
+      const roomId = button.dataset.adminRoomId;
+      const action = button.dataset.adminAction;
+      if (action === 'delete') deleteAdminRoom(roomId);
+    });
+
+    els.adminPlayers.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-admin-player]');
+      if (!button) return;
+      const username = button.dataset.adminPlayer;
+      const action = button.dataset.adminPlayerAction;
+      if (action === 'ban') banAdminPlayer(username);
     });
 
     els.backToLobbyBtn.addEventListener('click', enterLobby);
@@ -1238,11 +1734,15 @@ console.log('hello');
 
     socket.on('rooms-updated', ({ rooms }) => {
       renderRoomList(rooms || []);
-      if (state.adminEnabled) renderAdminRooms(rooms || []);
+      if (state.adminEnabled) {
+        renderAdminRooms(rooms || []);
+        loadAdminRooms();
+      }
     });
 
-    socket.on('room-joined', ({ room, content, isOwner, memberNames, maxPerson }) => {
-      enterRoom(room.roomId, content, isOwner, room.owner, room.memberCount, memberNames, maxPerson);
+    socket.on('room-joined', ({ room, content, isOwner, memberNames, maxPerson, isBanned }) => {
+      enterRoom(room.roomId, content, isOwner, room.owner, room.memberCount, memberNames, maxPerson, isBanned);
+      updateBanUi();
     });
 
     socket.on('room-presence', ({ roomId, memberCount, memberNames, maxPerson }) => {
@@ -1258,6 +1758,11 @@ console.log('hello');
 
     socket.on('settings-updated', (settings) => {
       applySettings(settings);
+    });
+
+    socket.on('ban-state', ({ isBanned }) => {
+      state.isBanned = !!isBanned;
+      updateBanUi();
     });
 
     socket.on('system-overview', ({ load, settings }) => {
@@ -1294,14 +1799,30 @@ console.log('hello');
       if (state.adminEnabled) loadAdminRooms();
     });
 
-    ensureUser();
-    applyFontSizes();
-    renderMarkdown(state.editorValue);
-    attachDividerDrag();
-    loadRooms();
-    if (state.adminEnabled) loadAdminRooms();
-    updateEditorButtons();
-    updateHeader();
+    async function bootstrap() {
+      try {
+        await ensureUser();
+        applyFontSizes();
+        renderMarkdown(state.editorValue);
+        attachDividerDrag();
+        await loadRooms();
+        updateAdminPanel();
+        if (state.adminRoute || getCookie('adminpass')) {
+          await loadAdminRooms();
+        }
+        socket.emit('register-user', { username: state.username });
+        updateEditorButtons();
+        updateBanUi();
+        updateHeader();
+        if (state.adminRoute) {
+          setView('admin');
+        }
+      } catch (error) {
+        showMessage(error && error.message ? error.message : '初始化账户失败，请刷新页面。', true);
+      }
+    }
+
+    bootstrap();
   </script>
 </body>
 </html>

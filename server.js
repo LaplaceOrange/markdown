@@ -9,15 +9,18 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_COOKIE_CODE = process.env.ADMIN_COOKIE_CODE || '1145';
-const NAME_ROOM_REGEX = /^[A-Za-z\u4e00-\u9fa5]{1,20}$/;
+let adminCookieCode = process.env.ADMIN_COOKIE_CODE || '1145';
+const NAME_ROOM_REGEX = /^[A-Za-z0-9\u4e00-\u9fa5]{1,20}$/;
 const MAX_ROOMS_PER_USER = 3;
 const STATUS_PUSH_INTERVAL = 5000;
 
 const settings = {
   maxPerson: Math.max(1, Number(process.env.DEFAULT_MAX_PERSON) || 5),
   bannedWords: ['78', '91', 'sb'],
+  bannedPlayers: [],
 };
+
+const ipUsers = Object.create(null);
 
 /**
  * rooms:
@@ -46,7 +49,6 @@ const userOwnedRooms = Object.create(null);
 const socketSessions = new Map();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 function normalizeValue(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -54,18 +56,140 @@ function normalizeValue(value) {
 
 function normalizeWords(words) {
   if (!Array.isArray(words)) {
-    return settings.bannedWords;
+    return settings.bannedWords.filter((word) => word !== 'admin');
   }
 
   const nextWords = Array.from(
     new Set(
       words
         .map((item) => normalizeValue(item).toLowerCase())
-        .filter(Boolean),
+        .filter((item) => Boolean(item) && item !== 'admin'),
     ),
   );
 
-  return nextWords.length ? nextWords : settings.bannedWords;
+   return nextWords.length ? nextWords : settings.bannedWords.filter((word) => word !== 'admin');
+}
+
+function normalizePlayers(players) {
+  if (!Array.isArray(players)) {
+    return settings.bannedPlayers;
+  }
+
+  return Array.from(
+    new Set(
+      players
+        .map((item) => normalizeValue(item))
+        .filter((item) => isValidName(item)),
+    ),
+  );
+}
+
+function randomLetters(length) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let output = '';
+  for (let i = 0; i < length; i += 1) {
+    output += letters[Math.floor(Math.random() * letters.length)];
+  }
+  return output;
+}
+
+function generateDefaultUsername() {
+  let candidate = `User${randomLetters(4)}`;
+  while (!isValidName(candidate)) {
+    candidate = `User${randomLetters(4)}`;
+  }
+  return candidate;
+}
+
+function normalizeIp(value) {
+  const normalized = normalizeValue(value);
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized === '::1' || normalized === '127.0.0.1' || normalized === '::ffff:127.0.0.1') {
+    return 'loopback';
+  }
+
+  return normalized.replace(/^::ffff:/, '');
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return normalizeIp(forwarded.split(',')[0]);
+  }
+
+  return normalizeIp(req.socket?.remoteAddress || req.ip || '');
+}
+
+function ensureIdentityByIp(ip) {
+  if (!ipUsers[ip]) {
+    ipUsers[ip] = generateDefaultUsername();
+  }
+
+  return ipUsers[ip];
+}
+
+function bindIpUser(ip, username) {
+  if (!ip || !isValidName(username)) {
+    return '';
+  }
+
+  ipUsers[ip] = username;
+  return ipUsers[ip];
+}
+
+function isBannedPlayer(username) {
+  return settings.bannedPlayers.includes(normalizeValue(username));
+}
+
+function getOnlineUsers() {
+  return Array.from(
+    new Set(
+      Array.from(socketSessions.values())
+        .map((session) => normalizeValue(session.username))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function getAdminSettings() {
+  return {
+    maxPerson: settings.maxPerson,
+    bannedWords: [...settings.bannedWords],
+    bannedPlayers: [...settings.bannedPlayers],
+  };
+}
+
+function parseCookies(cookieHeader) {
+  const cookies = Object.create(null);
+  const source = typeof cookieHeader === 'string' ? cookieHeader : '';
+
+  source.split(';').forEach((item) => {
+    const parts = item.split('=');
+    const key = normalizeValue(parts.shift());
+    if (!key) {
+      return;
+    }
+
+    cookies[key] = decodeURIComponent(parts.join('=') || '');
+  });
+
+  return cookies;
+}
+
+function decodeBase64(value) {
+  try {
+    return Buffer.from(String(value || ''), 'base64').toString('utf8');
+  } catch (error) {
+    return '';
+  }
+}
+
+function isValidAdminCode(value) {
+  const normalized = normalizeValue(value);
+  return Boolean(normalized) && /^[A-Za-z0-9]+$/.test(normalized);
 }
 
 function hasBannedWord(value) {
@@ -170,6 +294,30 @@ function emitSettingsUpdated() {
   });
 }
 
+function emitBanState(socket) {
+  if (!socket) {
+    return;
+  }
+
+  const session = socketSessions.get(socket.id);
+  socket.emit('ban-state', {
+    isBanned: isBannedPlayer(session?.username || ''),
+  });
+}
+
+function emitBanStates() {
+  socketSessions.forEach((session, socketId) => {
+    const targetSocket = io.sockets.sockets.get(socketId);
+    if (!targetSocket) {
+      return;
+    }
+
+    targetSocket.emit('ban-state', {
+      isBanned: isBannedPlayer(session.username || ''),
+    });
+  });
+}
+
 function removeRoom(roomId) {
   const room = rooms[roomId];
   if (!room) {
@@ -202,8 +350,15 @@ function removeRoom(roomId) {
 }
 
 function isAdminRequest(req) {
-  return normalizeValue(req.query.admin || req.body?.admin) === ADMIN_COOKIE_CODE;
+  const cookies = parseCookies(req.headers.cookie);
+  return decodeBase64(cookies.adminpass) === adminCookieCode;
 }
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/rooms', (req, res) => {
   res.json({
@@ -213,6 +368,45 @@ app.get('/api/rooms', (req, res) => {
   });
 });
 
+app.get('/api/identity', (req, res) => {
+  const ip = getClientIp(req);
+
+  if (!ip) {
+    return res.status(400).json({ message: '无法识别客户端 IP。' });
+  }
+
+  const username = ensureIdentityByIp(ip);
+
+  return res.json({
+    username,
+  });
+});
+
+app.post('/api/identity', (req, res) => {
+  const ip = getClientIp(req);
+  const username = normalizeValue(req.body?.username);
+
+  if (!ip) {
+    return res.status(400).json({ message: '无法识别客户端 IP。' });
+  }
+
+  if (!isValidName(username)) {
+    return res.status(400).json({ message: '昵称仅支持 20 字内中英文，且不能包含违禁词。' });
+  }
+
+  return res.json({
+    username: bindIpUser(ip, username),
+  });
+});
+
+app.get('/api/admin/session', (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ ok: false, message: '无管理员权限。' });
+  }
+
+  return res.json({ ok: true });
+});
+
 app.get('/api/admin/rooms', (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ message: '无管理员权限。' });
@@ -220,7 +414,8 @@ app.get('/api/admin/rooms', (req, res) => {
 
   return res.json({
     rooms: Object.keys(rooms).map(serializeRoom),
-    settings: getPublicSettings(),
+    onlineUsers: getOnlineUsers(),
+    settings: getAdminSettings(),
     load: getServerLoad(),
   });
 });
@@ -232,19 +427,74 @@ app.post('/api/admin/settings', (req, res) => {
 
   const nextMaxPerson = Number(req.body?.maxPerson);
   const nextBannedWords = normalizeWords(req.body?.bannedWords);
+  const nextBannedPlayers = normalizePlayers(req.body?.bannedPlayers);
+  const nextAdminCode = normalizeValue(req.body?.adminCode);
 
   if (!Number.isInteger(nextMaxPerson) || nextMaxPerson < 1 || nextMaxPerson > 100) {
     return res.status(400).json({ message: 'maxPerson 必须是 1 到 100 之间的整数。' });
   }
 
+  if (nextAdminCode && !isValidAdminCode(nextAdminCode)) {
+    return res.status(400).json({ message: '管理员暗号仅支持数字或字母。' });
+  }
+
   settings.maxPerson = nextMaxPerson;
   settings.bannedWords = nextBannedWords;
+  settings.bannedPlayers = nextBannedPlayers;
+  if (nextAdminCode) {
+    adminCookieCode = nextAdminCode;
+  }
 
   emitSettingsUpdated();
+  emitBanStates();
 
   return res.json({
     message: '管理员设置已更新。',
-    settings: getPublicSettings(),
+    settings: getAdminSettings(),
+  });
+});
+
+app.post('/api/admin/players/ban', (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ message: '无管理员权限。' });
+  }
+
+  const username = normalizeValue(req.body?.username);
+  if (!isValidName(username)) {
+    return res.status(400).json({ message: '玩家名仅支持 20 字内数字、中英文，且不能包含违禁词。' });
+  }
+
+  if (!settings.bannedPlayers.includes(username)) {
+    settings.bannedPlayers.push(username);
+  }
+
+  emitBanStates();
+
+  return res.json({
+    message: `玩家 ${username} 已封禁。`,
+    settings: getAdminSettings(),
+    onlineUsers: getOnlineUsers(),
+  });
+});
+
+app.delete('/api/admin/rooms/:roomId', (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ message: '无管理员权限。' });
+  }
+
+  const roomId = normalizeValue(req.params.roomId);
+  const room = rooms[roomId];
+
+  if (!room) {
+    return res.status(404).json({ message: '房间不存在或已删除。' });
+  }
+
+  removeRoom(roomId);
+  emitRoomsUpdated();
+  emitSystemOverview();
+
+  return res.json({
+    message: `房间 ${roomId} 已删除。`,
   });
 });
 
@@ -259,13 +509,35 @@ io.on('connection', (socket) => {
     load: getServerLoad(),
     settings: getPublicSettings(),
   });
+  emitBanState(socket);
+
+  socket.on('register-user', ({ username }) => {
+    const normalizedUser = normalizeValue(username);
+    const session = socketSessions.get(socket.id);
+
+    if (!session || !isValidName(normalizedUser)) {
+      return;
+    }
+
+    session.username = normalizedUser;
+    emitBanState(socket);
+  });
 
   socket.on('create-room', ({ username, roomId }) => {
     const normalizedUser = normalizeValue(username);
     const normalizedRoomId = normalizeValue(roomId);
+    const session = socketSessions.get(socket.id);
 
     if (!isValidName(normalizedUser) || !isValidName(normalizedRoomId)) {
-      return socket.emit('action-error', { message: '昵称和房间号仅支持 20 字内中英文，且不能包含违禁词。' });
+      return socket.emit('action-error', { message: '昵称和房间号仅支持 20 字内数字、中英文，且不能包含违禁词。' });
+    }
+
+    if (isBannedPlayer(normalizedUser)) {
+      return socket.emit('action-error', { message: '当前账号已被封禁，无法创建房间。' });
+    }
+
+    if (session) {
+      session.username = normalizedUser;
     }
 
     if (rooms[normalizedRoomId]) {
@@ -302,7 +574,7 @@ io.on('connection', (socket) => {
     }
 
     if (!isValidName(normalizedUser) || !isValidName(normalizedRoomId)) {
-      return socket.emit('action-error', { message: '昵称和房间号仅支持 20 字内中英文，且不能包含违禁词。' });
+      return socket.emit('action-error', { message: '昵称和房间号仅支持 20 字内数字、中英文，且不能包含违禁词。' });
     }
 
     const room = rooms[normalizedRoomId];
@@ -331,6 +603,7 @@ io.on('connection', (socket) => {
       room: serializeRoom(normalizedRoomId),
       content: room.content,
       isOwner: room.owner === normalizedUser,
+      isBanned: isBannedPlayer(normalizedUser),
       memberNames: getRoomMemberNames(normalizedRoomId),
       maxPerson: settings.maxPerson,
     });
@@ -373,6 +646,10 @@ io.on('connection', (socket) => {
       return socket.emit('action-error', { message: '只有房主可以删除房间。' });
     }
 
+    if (isBannedPlayer(normalizedUser)) {
+      return socket.emit('action-error', { message: '当前账号已被封禁，无法删除房间。' });
+    }
+
     removeRoom(normalizedRoomId);
 
     socket.emit('room-removed', { roomId: normalizedRoomId });
@@ -386,6 +663,12 @@ io.on('connection', (socket) => {
     const session = socketSessions.get(socket.id);
 
     if (!room || !session || session.roomId !== normalizedRoomId) {
+      return;
+    }
+
+    if (isBannedPlayer(session.username)) {
+      socket.emit('action-error', { message: '当前账号已被封禁，无法修改房间内容。' });
+      emitBanState(socket);
       return;
     }
 
@@ -426,5 +709,5 @@ setInterval(() => {
 
 server.listen(PORT, () => {
   console.log(`Markdown collaboration server running at http://localhost:${PORT}`);
-  console.log(`Admin cookie code: ${ADMIN_COOKIE_CODE}`);
+  console.log(`Admin cookie code: ${adminCookieCode}`);
 });
